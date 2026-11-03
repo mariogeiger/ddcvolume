@@ -3,6 +3,11 @@
 # helper (per user, as a LaunchAgent). `./install.sh uninstall` removes both.
 set -eu
 
+if [ "$(id -u)" = 0 ]; then
+	echo "run as yourself, not root: the helper is a per-user agent, and the script asks sudo for the driver" >&2
+	exit 1
+fi
+
 DRIVER=/Library/Audio/Plug-Ins/HAL/DDCVolume.driver
 APP="$HOME/Applications/DDCVolume.app"
 AGENT=local.ddcvolume.helper
