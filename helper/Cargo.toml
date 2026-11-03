@@ -1,0 +1,14 @@
+[package]
+name = "helper"
+edition.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "ddcvolumed"
+path = "src/main.rs"
+
+[dependencies]
+ddc = { path = "../ddc" }
+objc2-core-audio.workspace = true
+objc2-core-audio-types.workspace = true
+objc2-core-foundation.workspace = true

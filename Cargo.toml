@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = ["ddc", "driver", "helper"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+
+[workspace.dependencies]
+objc2-core-audio = { version = "0.3.2", default-features = false, features = ["std", "AudioHardware", "AudioServerPlugIn", "objc2-core-audio-types"] }
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFBase", "CFString", "CFDictionary", "CFArray", "CFNumber", "CFUUID"] }
+
+[profile.release]
+panic = "abort"

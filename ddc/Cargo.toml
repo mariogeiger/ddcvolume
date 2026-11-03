@@ -1,0 +1,8 @@
+[package]
+name = "ddc"
+edition.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "ddcvol"
+path = "src/main.rs"
