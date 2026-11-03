@@ -44,6 +44,28 @@ struct Helper {
     listening: Option<Id>,
 }
 
+/// Steps of the volume keys across the full range.
+const KEY_STEPS: f32 = 16.0;
+
+/// Exponent of the loudness curve: the gentlest power law whose first key
+/// step is the screen's smallest audible value, 1. Linear (1) when the screen
+/// has fewer values than the keys have steps.
+fn exponent(max: u16) -> f32 {
+    (max as f32).ln().max(KEY_STEPS.ln()) / KEY_STEPS.ln()
+}
+
+/// Screen value for a volume scalar; any sound at all is at least 1.
+fn to_screen(scalar: f32, max: u16) -> u16 {
+    let scalar = scalar.clamp(0.0, 1.0);
+    let value = (max as f32 * scalar.powf(exponent(max))).round() as u16;
+    if scalar > 0.0 { value.max(1) } else { 0 }
+}
+
+/// Volume scalar for a screen value, inverting `to_screen`.
+fn from_screen(value: u16, max: u16) -> f32 {
+    (value as f32 / max as f32).powf(exponent(max).recip())
+}
+
 /// The first output device carried by a display link.
 fn find_display() -> Option<Id> {
     hal::get_vec::<Id>(SYSTEM, kAudioHardwarePropertyDevices, GLOBAL).into_iter().find(|&device| {
@@ -102,7 +124,7 @@ impl Helper {
         let vcp = ddc.as_ref().and_then(|d| d.get(ddc::VOLUME).map_err(|e| eprintln!("ddcvolumed: {e}")).ok());
         let (sent, max) = vcp.map_or((0, 0), |v| (v.current, v.max));
         if max > 0 {
-            let _ = hal::set(output, kAudioDevicePropertyVolumeScalar, OUTPUT, &(sent as f32 / max as f32));
+            let _ = hal::set(output, kAudioDevicePropertyVolumeScalar, OUTPUT, &from_screen(sent, max));
         }
         Some(Active { display, output, _route: route, ddc, max, sent })
     }
@@ -112,7 +134,7 @@ impl Helper {
         let Some(active) = &mut self.active else { return };
         let Some(ddc) = &active.ddc else { return };
         let Some(scalar) = hal::get::<f32>(active.output, kAudioDevicePropertyVolumeScalar, OUTPUT) else { return };
-        let value = (scalar.clamp(0.0, 1.0) * active.max as f32).round() as u16;
+        let value = to_screen(scalar, active.max);
         if value != active.sent {
             match ddc.set(ddc::VOLUME, value) {
                 Ok(()) => active.sent = value,
@@ -153,6 +175,28 @@ fn main() {
         }
         if batch.contains(&Event::Volume) {
             helper.mirror_volume();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_key_step_is_one() {
+        let steps: Vec<u16> = (0..=16).map(|k| to_screen(k as f32 / KEY_STEPS, 100)).collect();
+        assert_eq!(steps[..2], [0, 1]);
+        assert_eq!(steps[16], 100);
+        assert!(steps.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn screen_values_round_trip() {
+        for max in [1, 10, 16, 100, 255] {
+            for value in 0..=max {
+                assert_eq!(to_screen(from_screen(value, max), max), value, "max {max}");
+            }
         }
     }
 }
